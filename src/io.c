@@ -500,7 +500,7 @@ static void dshotdma(void) {
 			break;
 		case 41: // Select PWM frequency
 			if (cnt != 6) break;
-			if ((x = (cfg.freq_min >> 2) + 1) > 12 || x < 6) x = 6;
+			if ((x = (cfg.freq_min >> 2) + 1) > 18 || x < 6) x = 6;  // ajb 72/144 kHz limits
 			cfg.freq_min = x << 2;
 			cfg.freq_max = x << 3;
 			beepval = x - 5;
