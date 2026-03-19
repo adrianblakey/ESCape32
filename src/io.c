@@ -500,9 +500,12 @@ static void dshotdma(void) {
 			break;
 		case 41: // Select PWM frequency
 			if (cnt != 6) break;
-			if ((x = (cfg.freq_min >> 2) + 1) > 18 || x < 6) x = 6;  // ajb 72/144 kHz limits
-			cfg.freq_min = x << 2;
-			cfg.freq_max = x << 3;
+			// freq_min: round down to nearest multiple of 4, clamp 48..152
+			cfg.freq_min = (cfg.freq_min >> 2) << 2;
+			if (cfg.freq_min > 152 || cfg.freq_min < 48) cfg.freq_min = 48;
+			// freq_max: round down to nearest multiple of 4, clamp to [freq_min..152]
+			cfg.freq_max = (cfg.freq_max >> 2) << 2;
+			if (cfg.freq_max > 152 || cfg.freq_max < cfg.freq_min) cfg.freq_max = cfg.freq_min << 1;
 			beepval = x - 5;
 			break;
 		case 42: // Select maximum duty cycle ramp
