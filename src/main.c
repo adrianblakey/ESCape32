@@ -306,7 +306,8 @@ static void nextstep(void) {
 		TIM_CR1(IFTIM) = TIM_CR1_CEN | TIM_CR1_ARPE | TIM_CR1_URS | TIM_CR1_CKD_CK_INT_MUL_2;
 	} else { // Minimum PWM frequency
 #ifdef TIM1_CCR5
-		TIM1_CCR5 = IFTIM_ICFL << 2;
+		// Blanking = BLANK_US microseconds, in TIM1 counts at CLK_MHZ
+		TIM1_CCR5 = BLANK_US * CLK_MHZ;
 #else
 		TIM1_CCR4 = IFTIM_ICFL << 2;
 #endif
