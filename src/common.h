@@ -66,8 +66,8 @@ typedef struct {
 	char timing;
 	char sine_range;
 	char sine_power;
-	char freq_min;
-	char freq_max;
+	uint8_t freq_min;
+	uint8_t freq_max;
 	char duty_min;
 	char duty_max;
 	char duty_spup;
