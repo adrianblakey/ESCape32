@@ -407,8 +407,8 @@ void checkcfg(void) {
 	cfg.timing = clamp(cfg.timing, 1, 31);
 	cfg.sine_range = cfg.sine_range && cfg.damp && !cfg.brushed ? clamp(cfg.sine_range, 5, 25) : 0;
 	cfg.sine_power = clamp(cfg.sine_power, 1, 15);
-	cfg.freq_min = clamp(cfg.freq_min, 48, 152);
-	cfg.freq_max = clamp(cfg.freq_max, cfg.freq_min, 152);
+	cfg.freq_min = clamp(cfg.freq_min, 24, 96);
+	cfg.freq_max = clamp(cfg.freq_max, 24, 200);
 	cfg.duty_min = clamp(cfg.duty_min, 1, 100);
 	cfg.duty_max = clamp(cfg.duty_max, cfg.duty_min, 100);
 	cfg.duty_spup = clamp(cfg.duty_spup, 1, 100);
