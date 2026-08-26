@@ -20,6 +20,14 @@ add_compile_options(-ffreestanding -ffunction-sections -fdata-sections -fsingle-
 	-Wno-variadic-macros -Wno-unused-result -Wno-unused-parameter)
 add_link_options(-nostartfiles -Wl,--gc-sections)
 
+# Appended to every build artifact's filename (elf/bin/hex), not to the CMake
+# target name itself -- so `make AART1` / `flash-AART1` etc. keep working
+# unchanged. This fork publishes into the same release repo as
+# aartech-dev/ESCape32, which builds the AART* targets under identical names
+# with no such suffix -- BUILD_TAG keeps this fork's artifacts distinguishable
+# from theirs. Override with `cmake -B build -D BUILD_TAG=...`.
+set(BUILD_TAG "-ab" CACHE STRING "Suffix appended to build artifact filenames")
+
 function(add_target name mcu)
 	include(mcu/${mcu}/config.cmake)
 	file(READ src/main.c main_c)
@@ -29,9 +37,9 @@ function(add_target name mcu)
 	if (rev2)
 		string(REGEX REPLACE "[^0-9]+" "." rev2 ${rev2})
 	endif()
-	set(elf ${name}${rev1}${rev2}.elf)
-	set(bin ${name}${rev1}${rev2}.bin)
-	set(hex ${name}${rev1}${rev2}.hex)
+	set(elf ${name}${rev1}${rev2}${BUILD_TAG}.elf)
+	set(bin ${name}${rev1}${rev2}${BUILD_TAG}.bin)
+	set(hex ${name}${rev1}${rev2}${BUILD_TAG}.hex)
 	file(GLOB srcs src/*.c mcu/${mcu}/*.c)
 	add_executable(${elf} ${srcs})
 	if("SMALL_DEVICE" IN_LIST ARGN)
@@ -57,7 +65,12 @@ endfunction()
 
 add_subdirectory(boot)
 
-add_target(AART1 AT32F421 DEAD_TIME=0 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=270 ANALOG_MAX=1440 DUTY_MIN=100 DUTY_SPUP=25 FULL_DUTY IO_RXTX)
+add_target(AART1 AT32F421 DEAD_TIME=0 FREQ_MIN=48 FREQ_MAX=96 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 DUTY_SPUP=25 FULL_DUTY IO_RXTX)
+add_target(AARTG AT32F421 DEAD_TIME=24 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 DUTY_SPUP=20 DUTY_RAMP=0 DUTY_RATE=20 DUTY_DRAG=0 DUTY_LOCK=0 THROT_SET=100 FULL_DUTY IO_RXTX DAMP=1 TIMING=18 FREQ_MIN=48 FREQ_MAX=96)
+add_target(AARTIT AT32F421 TIMING=12 FREQ_MIN=48 FREQ_MAX=48 DUTY_RATE=20 DUTY_SPUP=20 DEAD_TIME=24 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 FULL_DUTY IO_RXTX)
+add_target(AART2 AT32F421 TIMING=15 FREQ_MIN=48 FREQ_MAX=96 DUTY_RATE=20 DUTY_SPUP=20 DEAD_TIME=24 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 FULL_DUTY IO_RXTX)
+add_target(AART2RF AT32F421 TIMING=20 FREQ_MIN=48 FREQ_MAX=96 DUTY_RATE=20 DUTY_SPUP=20 DEAD_TIME=24 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 FULL_DUTY IO_RXTX)
+add_target(AART3NSR AT32F421 TIMING=15 FREQ_MIN=48 FREQ_MAX=96 DUTY_RATE=20 DUTY_SPUP=20 DEAD_TIME=13 COMP_MAP=123 ARM=0 VOLUME=0 INPUT_MODE=1 ANALOG_CHAN=6 ANALOG_MIN=0 ANALOG_MAX=1440 DUTY_MIN=100 FULL_DUTY IO_RXTX)
 add_target(AIRBOT1 AT32F421 DEAD_TIME=66 COMP_MAP=321 SENS_MAP=0xA3A6 VOLT_MUL=74 CURR_MUL=30 LED_MAP=0xAFB3B4)
 add_target(AIRBOT2 STM32F051 DEAD_TIME=26 COMP_MAP=321 SENS_MAP=0xA3 VOLT_MUL=74 IO_PA2 SMALL_DEVICE DISABLE_HOTT)
 add_target(EMAX1 STM32F051 DEAD_TIME=26 COMP_MAP=123 IO_PA2 SMALL_DEVICE)
