@@ -1,0 +1,68 @@
+# ESCape32 firmware build environment -- Arch Linux variant
+#
+# Same idea as the Ubuntu Dockerfile: toolchain baked in, firmware source
+# mounted at runtime. The one thing that needs care on Arch specifically is
+# that it's rolling-release -- a bare `pacman -Syu` gives you whatever's
+# current the moment you run `docker build`, which could differ between two
+# builds of this exact same file months apart. Pinning to an Arch Linux
+# Archive snapshot date fixes that, the same way `ubuntu:24.04` freezes a
+# point in time for the apt-based version.
+#
+# NOTE: not build-tested the way the Ubuntu Dockerfile was (package names
+# confirmed against archlinux.org, but this hasn't actually been run through
+# `docker build` + a real firmware build) -- do that yourself before trusting
+# this the way the Ubuntu one has been.
+#
+# Build:
+#   docker build -f Dockerfile.arch -t escape32-builder-arch .
+# Use exactly like the Ubuntu image -- see build.sh / README.md.
+
+FROM archlinux:base
+
+# Pick a date and stick with it. Bump deliberately, not as a side effect of
+# an unrelated rebuild -- same philosophy as the pins below.
+ARG ARCHIVE_DATE=2026/08/01
+
+RUN echo "Server=https://archive.archlinux.org/repos/${ARCHIVE_DATE}/\$repo/os/\$arch" \
+        > /etc/pacman.d/mirrorlist \
+    && pacman -Syyuu --noconfirm \
+    && pacman -S --noconfirm --needed \
+        cmake \
+        git \
+        make \
+        curl \
+        tar \
+        xz \
+        stlink \
+        python \
+    && pacman -Scc --noconfirm \
+    && rm -rf /var/cache/pacman/pkg/*
+
+ARG LIBOPENCM3_REF=2da12dc96e0b9e42a3332348dd9b02a0a17981f8
+ARG LIBOPENCM3_TARGETS="stm32/f0 stm32/g0 stm32/g4 stm32/l4"
+
+# Use the official ARM GNU Toolchain release rather than Arch's own
+# arm-none-eabi-gcc package -- see README.md for why (flash-constrained
+# targets are sensitive to compiler version, and this keeps the Ubuntu and
+# Arch images producing the same output).
+ARG ARM_TOOLCHAIN_VERSION=14.2.rel1
+ARG ARM_TOOLCHAIN_URL=https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_TOOLCHAIN_VERSION}/binrel/arm-gnu-toolchain-${ARM_TOOLCHAIN_VERSION}-x86_64-arm-none-eabi.tar.xz
+
+RUN curl -fsSL "${ARM_TOOLCHAIN_URL}" -o /tmp/arm-toolchain.tar.xz \
+    && mkdir -p /opt/arm-gnu-toolchain \
+    && tar -xf /tmp/arm-toolchain.tar.xz -C /opt/arm-gnu-toolchain --strip-components=1 \
+    && rm /tmp/arm-toolchain.tar.xz
+
+ENV PATH="/opt/arm-gnu-toolchain/bin:${PATH}"
+
+RUN git clone https://github.com/libopencm3/libopencm3.git /opt/libopencm3 \
+    && cd /opt/libopencm3 \
+    && git checkout "${LIBOPENCM3_REF}" \
+    && make TARGETS="${LIBOPENCM3_TARGETS}" \
+    && rm -rf /opt/libopencm3/.git
+
+ENV LIBOPENCM3_DIR=/opt/libopencm3
+
+WORKDIR /workspace
+
+CMD ["bash"]

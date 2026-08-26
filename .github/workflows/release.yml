@@ -1,0 +1,96 @@
+name: Build & Release Firmware
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  # Must match the tag pushed by build-image.yml.
+  BUILDER_IMAGE: ghcr.io/adrianblakey/escape32-builder:latest
+  # Your two release repos, as owner/name. Create these first -- see docker/SETUP.md.
+  PRIVATE_REPO: adrianblakey/escape32-firmware-internal
+  PUBLIC_REPO: adrianblakey/escape32-firmware
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute version
+        id: version
+        run: echo "version=$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull builder image
+        run: docker pull "$BUILDER_IMAGE"
+
+      - name: Build firmware
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" --user "$(id -u):$(id -g)" "$BUILDER_IMAGE" \
+            bash -c 'cmake -B build -D LIBOPENCM3_DIR=$LIBOPENCM3_DIR && make -C build -j$(nproc)'
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p release-assets
+          find build -maxdepth 1 -type f \( -name '*.bin' -o -name '*.hex' \) -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.version.outputs.version }}
+          path: release-assets/*
+          retention-days: 30
+
+  publish-private:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware-${{ needs.build.outputs.version }}
+          path: release-assets
+
+      - name: Create private release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          gh release create "v${{ needs.build.outputs.version }}" release-assets/* \
+            --repo "$PRIVATE_REPO" \
+            --title "Firmware ${{ needs.build.outputs.version }}" \
+            --notes "Automated build from ${{ github.repository }}@${{ github.sha }}"
+
+  publish-public:
+    needs: build
+    runs-on: ubuntu-latest
+    # Requires manual approval: Settings -> Environments -> public-release ->
+    # add required reviewers. Nothing reaches the public repo without someone
+    # clicking approve on the run.
+    environment: public-release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware-${{ needs.build.outputs.version }}
+          path: release-assets
+
+      - name: Create public release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          gh release create "v${{ needs.build.outputs.version }}" release-assets/* \
+            --repo "$PUBLIC_REPO" \
+            --title "Firmware ${{ needs.build.outputs.version }}" \
+            --notes "Release ${{ needs.build.outputs.version }}"

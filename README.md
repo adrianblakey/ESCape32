@@ -43,6 +43,9 @@ Dependencies
 Building from source
 --------------------
 
+Don't want to install the toolchain locally? See [docker/README.md](docker/README.md) for a
+pinned, reproducible Docker build environment instead.
+
 Use `LIBOPENCM3_DIR` to specify a path to LibOpenCM3 if it is not in the system root:
 
 ```
