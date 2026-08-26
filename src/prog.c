@@ -25,8 +25,8 @@
 	XX( 4, val, timing,      TIMING,      "",                                               0,    1,   31,  0, cfg.brushed, 0) \
 	XX( 5, val, sine_range,  SINE_RANGE,  "%",                                              0,    0,   25,  0, cfg.brushed, 0) \
 	XX( 6, val, sine_power,  SINE_POWER,  "%",                                              0,    1,   15,  0, cfg.brushed, 0) \
-	XX( 7, val, freq_min,    FREQ_MIN,    "kHz",                                            0,   16,   48,  0, cfg.brushed, 0) \
-	XX( 8, val, freq_max,    FREQ_MAX,    "kHz",                                            0,   16,   96,  0, 0, 0) \
+	XX( 7, val, freq_min,    FREQ_MIN,    "kHz",                                            0,   48,  152,  0, cfg.brushed, 0) \
+	XX( 8, val, freq_max,    FREQ_MAX,    "kHz",                                            0,   48,  152,  0, 0, 0) \
 	XX( 9, val, duty_min,    DUTY_MIN,    "%",                                              0,    1,  100,  0, 0, 0) \
 	XX(10, val, duty_max,    DUTY_MAX,    "%",                                              0,    1,  100,  0, 0, 0) \
 	XX(11, val, duty_spup,   DUTY_SPUP,   "%",                                              0,    1,  100,  0, cfg.brushed, 0) \
