@@ -454,6 +454,12 @@ void checkcfg(void) {
 	cfg.analog_max = clamp(cfg.analog_max, cfg.analog_min + 200, 3400);
 #ifdef IO_PA2
 	cfg.input_mode = clamp(cfg.input_mode, 0, 7);
+#ifdef DISABLE_EXBUS
+	if (cfg.input_mode == 6) cfg.input_mode = 0;
+#endif
+#ifdef DISABLE_HOTT
+	if (cfg.input_mode == 7) cfg.input_mode = 0;
+#endif
 	cfg.input_ch1 = clamp(cfg.input_ch1, 1, cfg.input_mode < 3 ? 0 : 32);
 	cfg.input_ch2 = clamp(cfg.input_ch2, 0, cfg.input_mode < 3 ? 0 : 32);
 #else
@@ -466,12 +472,29 @@ void checkcfg(void) {
 	cfg.input_ch2 = 0;
 #endif
 	cfg.telem_mode = clamp(cfg.telem_mode, 0, 6);
+#ifdef DISABLE_MSB
+	if (cfg.telem_mode == 5) cfg.telem_mode = 0;
+#endif
+#ifdef DISABLE_HOTT
+	if (cfg.telem_mode == 6) cfg.telem_mode = 0;
+#endif
 	cfg.telem_phid =
 		cfg.telem_mode == 2 ||
 		cfg.telem_mode == 5 ? clamp(cfg.telem_phid, 1, 2):
 		cfg.telem_mode == 3 ? clamp(cfg.telem_phid, 1, 28):
+		cfg.telem_mode == 4 ? clamp(cfg.telem_phid, 1, 8):
 		cfg.input_mode == 4 ? clamp(cfg.telem_phid, 0, 4) : 0;
 	cfg.telem_poles = clamp(cfg.telem_poles & ~1, 2, 100);
+#if SENS_CNT >= 1
+	cfg.telem_volt = clamp(cfg.telem_volt, -80, 160);
+#else
+	cfg.telem_volt = 0;
+#endif
+#if SENS_CNT >= 2
+	cfg.telem_curr = clamp(cfg.telem_curr, -100, 200);
+#else
+	cfg.telem_curr = 0;
+#endif
 	cfg.prot_stall = cfg.prot_stall && !cfg.brushed ? clamp(cfg.prot_stall, 1500, 3500) : 0;
 	cfg.prot_temp = cfg.prot_temp ? clamp(cfg.prot_temp, 60, 140) : 0;
 #if SENS_CNT >= 3
@@ -479,14 +502,14 @@ void checkcfg(void) {
 #else
 	cfg.prot_sens = 0;
 #endif
-#if SENS_CNT >= 1 && VOLT_MUL > 0
+#if SENS_CNT >= 1 && !defined ANALOG
 	cfg.prot_volt = cfg.prot_volt ? clamp(cfg.prot_volt, 28, 38) : 0;
 	cfg.prot_cells = clamp(cfg.prot_cells, 0, 24);
 #else
 	cfg.prot_volt = 0;
 	cfg.prot_cells = 0;
 #endif
-#if SENS_CNT >= 2 && CURR_MUL > 0
+#if SENS_CNT >= 2
 	cfg.prot_curr = clamp(cfg.prot_curr, 0, 999);
 #else
 	cfg.prot_curr = 0;
@@ -548,10 +571,12 @@ int savecfg(void) {
 }
 
 int resetcfg(void) {
+	if (ertm || busy) return 0;
 	__disable_irq();
 	memcpy(&cfg, &cfgdata, sizeof cfgdata);
 	__enable_irq();
 	checkcfg();
+	rearm = 1; // Ensure safe throttle mode change
 	return savecfg();
 }
 

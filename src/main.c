@@ -17,8 +17,8 @@
 
 #include "common.h"
 
-#define REVISION 16
-#define REVPATCH 2
+#define REVISION 17
+#define REVPATCH 1
 
 const Cfg cfgdata = {
 	.id = 0x32ea,
@@ -36,7 +36,7 @@ const Cfg cfgdata = {
 	.freq_max = FREQ_MAX,       // Maximum PWM frequency (kHz) [48..152]
 	.duty_min = DUTY_MIN,       // Minimum duty cycle (%) [1..100]
 	.duty_max = DUTY_MAX,       // Maximum duty cycle (%) [1..100]
-	.duty_spup = DUTY_SPUP,     // Maximum duty cycle during spin-up (%) [1..25]
+	.duty_spup = DUTY_SPUP,     // Maximum duty cycle during spin-up (%) [1..100]
 	.duty_ramp = DUTY_RAMP,     // Maximum duty cycle ramp (kERPM) [0..100]
 	.duty_rate = DUTY_RATE,     // Duty cycle slew rate (0.1%/ms) [1..100]
 	.duty_drag = DUTY_DRAG,     // Drag brake power (%) [0..100]
@@ -56,19 +56,21 @@ const Cfg cfgdata = {
 	.input_ch1 = INPUT_CH1,     // Throttle channel [0 - off, 1..32]
 	.input_ch2 = INPUT_CH2,     // Auxiliary channel [0 - off, 1..32]
 	.telem_mode = TELEM_MODE,   // Telemetry mode (0 - KISS, 1 - KISS auto, 2 - iBUS, 3 - S.Port, 4 - CRSF, 5 - MSB, 6 - HoTT)
-	.telem_phid = TELEM_PHID,   // Telemetry physical ID [0 - off, 1..2 - iBUS/MSB, 1..4 - SBUS2, 1..28 - S.Port]
+	.telem_phid = TELEM_PHID,   // Telemetry physical ID [0 - off, 1..2 - iBUS/MSB, 1..4 - SBUS2, 1..8 - CRSF, 1..28 - S.Port]
 	.telem_poles = TELEM_POLES, // Number of motor poles for RPM telemetry [2..100]
-	.prot_stall = PROT_STALL,   // Stall protection (ERPM) [0 - off, 1800..3200]
+	.telem_volt = TELEM_VOLT,   // Voltage sensor calibration (~0.6%) [-80..160]
+	.telem_curr = TELEM_CURR,   // Current sensor calibration (~0.5%) [-100..200]
+	.prot_stall = PROT_STALL,   // Stall protection (ERPM) [0 - off, 1500..3500]
 	.prot_temp = PROT_TEMP,     // Temperature threshold (C) [0 - off, 60..140]
 	.prot_sens = PROT_SENS,     // Temperature sensor (0 - ESC, 1 - motor, 2 - both)
 	.prot_volt = PROT_VOLT,     // Low voltage cutoff per battery cell (V/10) [0 - off, 28..38]
 	.prot_cells = PROT_CELLS,   // Number of battery cells [0 - auto, 1..24]
-	.prot_curr = PROT_CURR,     // Maximum current (A) [0..500]
+	.prot_curr = PROT_CURR,     // Maximum current (A) [0..999]
 	.prot_park = PROT_PARK,     // Parking speed [0..4]
 	.music = MUSIC,             // Startup music
 	.volume = VOLUME,           // Sound volume (%) [0..100]
 	.beacon = BEACON,           // Beacon volume (%) [0..100]
-	.bec = BEC,                 // BEC voltage control (0 - 5.5V, 1 - 6.5V, 2 - 7.4V, 3 - 8.4V, 4 - 12V)
+	.bec = BEC,                 // BEC voltage (0 - 5.5V, 1 - 6.5V, 2 - 7.4V, 3 - 8.4V, 4 - 12V)
 	.led = LED,                 // LED on/off bits [0..15]
 };
 
@@ -76,7 +78,7 @@ __attribute__((__section__(".cfg")))
 Cfg cfg = cfgdata;
 
 int throt, brake, ertm, erpm, temp1, temp2, volt, curr, csum, dshotval, beepval = -1;
-char analog, telreq, telmode, flipdir, beacon, dshotext, auxup;
+char analog, telreq, telmode, telphid, flipdir, beacon, dshotext, rearm, auxup;
 uint32_t tick;
 
 static int oldstep, step, sine, ival, cutback;
@@ -423,7 +425,7 @@ void tim3_isr(void) { // Any change on Hall sensor inputs
 #endif
 
 void adcdata(int t, int u, int v, int c, int a) {
-	static int z = 3300, i, q, st = -1, su = -1, sv = -1, sc = -1, sa = -1;
+	static int z = 3300, st = -1, su = -1, sa = -1;
 	if ((c -= z) >= 0) ready = 1;
 	else {
 		if (!ready) z += c >> 1;
@@ -431,13 +433,19 @@ void adcdata(int t, int u, int v, int c, int a) {
 	}
 	temp1 = max((t = smooth(&st, t, 10)) >> 2, 0); // C
 	temp2 = hall || cfg.prot_sens ? max((u = smooth(&su, TEMP_SENS(u), 10)) >> 2, 0) : 0; // C
-	volt = smooth(&sv, v * VOLT_MUL * 131 >> 17, 7); // V/100
-	curr = smooth(&sc, c * CURR_MUL * 205 >> 11, 4); // A/100
+#if SENS_CNT >= 1
+	static int sv = -1;
+	volt = smooth(&sv, v * VOLT_MUL * (cfg.telem_volt + 164) >> 14, 7); // V/100
+#endif
+#if SENS_CNT >= 2
+	static int sc = -1, i, q;
+	curr = smooth(&sc, c * CURR_MUL * (cfg.telem_curr + 205) >> 11, 4); // A/100
 	i += curr; // Current integral
 	if (!(tick & 0x3ff0)) {
 		csum = (q += i >> 10) * 91 >> 15; // mAh
 		i = 0;
 	}
+#endif
 	if (cfg.prot_temp) { // Temperature protection
 		int x = -(cfg.prot_temp << 2);
 		switch (cfg.prot_sens) {
@@ -559,6 +567,7 @@ void main(void) {
 	brake = cfg.duty_drag;
 	lock = cfg.duty_lock;
 	telmode = cfg.telem_mode;
+	telphid = cfg.telem_phid;
 #if defined ANALOG || defined ANALOG_CHAN
 	analog = IO_ANALOG;
 #endif
@@ -604,8 +613,8 @@ void main(void) {
 	STK_CVR = 0;
 	STK_CSR = STK_CSR_ENABLE | STK_CSR_TICKINT | STK_CSR_CLKSOURCE_AHB;
 #ifndef ANALOG
+#if SENS_CNT >= 1
 	int cells = cfg.prot_cells;
-#if SENS_CNT > 0
 	while (!ready) __WFI(); // Wait for sensors
 	if (!cells) cells = (volt + 439) / 440; // Assume maximum 4.4V per battery cell
 #endif
@@ -615,11 +624,13 @@ void main(void) {
 		const char *str = cfg.music;
 		if (str[0] == '~') playsound(_eod, clamp(atoi(str + 1), 0, 100));
 		else playmusic(str, cfg.volume);
+#if SENS_CNT >= 1
 		if (cfg.prot_volt) { // Report the number of battery cells
 			beepval = cells;
 			delay(4000, delayf);
 			beep();
 		}
+#endif
 	}
 	if (cfg.arm || (csr & RCC_CSR_WWDGRSTF)) { // Arming required
 	rearm:
@@ -637,16 +648,22 @@ void main(void) {
 			TIM6_EGR = TIM_EGR_UG;
 		}
 		throt = 0;
+		rearm = 0;
 		TIM6_CR1 = 0;
 		playmusic(hall ? "G_GC" : "GC", cfg.volume);
 	}
 #endif
 	laststep();
+#if SENS_CNT >= 1
+	int cutoff = 0;
+#endif
 	PID bpid = {.Kp = 50, .Ki = 0, .Kd = 1000}; // Stall protection
+#if SENS_CNT >= 2
 	PID cpid = {.Kp = 80, .Ki = 0, .Kd = 600}; // Overcurrent protection
-	for (int curduty = 0, running = 0, braking = 2, cutoff = 0, boost = 0, choke = 0, n = 0;;) {
+#endif
+	for (int curduty = 0, running = 0, braking = 2, boost = 0, choke = 0, n = 0;;) {
 		int ccr, arr = CLK_KHZ / cfg.freq_min;
-		int input = cutoff == 3000 ? 0 : throt;
+		int input = rearm ? 0 : throt;
 		int range = cfg.sine_range * 20;
 		int delta = range ? 10 : 0;
 		int newduty = 0;
@@ -826,15 +843,20 @@ void main(void) {
 		__WFI();
 		if (tick & 0xf) continue; // 16kHz -> 1kHz
 #ifndef ANALOG
+		if (rearm && !running) goto rearm;
 		if (++auxup == 100) { // Restore brake after 100ms timeout
 			brake = cfg.duty_drag;
 			auxup = 0;
 		}
+#if SENS_CNT >= 1
 		if (cutoff < 3000) cutoff = volt < cfg.prot_volt * cells * 10 ? cutoff + 1 : 0;
-		else if (!running) goto rearm; // Low voltage cutoff after 3s
+		else rearm = 1; // Low voltage cutoff after 3s
+#endif
 #endif
 		boost = cfg.prot_stall ? clamp(boost + (calcpid(&bpid, hall > 4000 ? hall : ival >> IFTIM_XRES, 20000000 / cfg.prot_stall - 800) >> 16), 0, 160) : 0; // Up to 8%
+#if SENS_CNT >= 2
 		choke = cfg.prot_curr ? clamp(choke + (calcpid(&cpid, curr, cfg.prot_curr * 100) >> 10), 0, 2000) : 0;
+#endif
 		beep();
 #ifdef LED_STAT
 		int x = 0;
