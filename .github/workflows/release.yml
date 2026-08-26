@@ -8,8 +8,7 @@ on:
 env:
   # Must match the tag pushed by build-image.yml.
   BUILDER_IMAGE: ghcr.io/adrianblakey/escape32-builder:latest
-  # Your two release repos, as owner/name. Create these first -- see docker/SETUP.md.
-  PRIVATE_REPO: adrianblakey/escape32-firmware-internal
+  # Release repo, as owner/name. Create this first -- see docker/SETUP.md.
   PUBLIC_REPO: adrianblakey/escape32-firmware
 
 permissions:
@@ -54,24 +53,6 @@ jobs:
           name: firmware-${{ steps.version.outputs.version }}
           path: release-assets/*
           retention-days: 30
-
-  publish-private:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: firmware-${{ needs.build.outputs.version }}
-          path: release-assets
-
-      - name: Create private release
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          gh release create "v${{ needs.build.outputs.version }}" release-assets/* \
-            --repo "$PRIVATE_REPO" \
-            --title "Firmware ${{ needs.build.outputs.version }}" \
-            --notes "Automated build from ${{ github.repository }}@${{ github.sha }}"
 
   publish-public:
     needs: build
