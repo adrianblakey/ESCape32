@@ -30,7 +30,7 @@
 	XX( 9, val, duty_min,    DUTY_MIN,    "%",                                              0,    1,  100,  0, 0, 0) \
 	XX(10, val, duty_max,    DUTY_MAX,    "%",                                              0,    1,  100,  0, 0, 0) \
 	XX(11, val, duty_spup,   DUTY_SPUP,   "%",                                              0,    1,  100,  0, cfg.brushed, 0) \
-	XX(12, val, duty_ramp,   DUTY_RAMP,   "kERPM",                                          0,    0,  100,  0, cfg.brushed, 0) \
+	XX(12, val, duty_ramp,   DUTY_RAMP,   "kERPM",                                          0,    0,  500,  0, cfg.brushed, 0) \
 	XX(13, val, duty_rate,   DUTY_RATE,   "%/ms",                                           1,    1,  100,  1, 0, 0) \
 	XX(14, val, duty_drag,   DUTY_DRAG,   "%",                                              0,    0,  100,  0, 0, 0) \
 	XX(15, val, duty_lock,   DUTY_LOCK,   "off;soft;hard",                                 -1,    0,    2,  0, cfg.brushed, 0) \
