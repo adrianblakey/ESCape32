@@ -24,7 +24,7 @@ Installation
 
 The list of compatible ESCs can be found [here](https://github.com/neoxic/ESCape32/wiki/Targets).
 
-The latest release can be downloaded [here](https://github.com/neoxic/ESCape32/releases).
+The latest release can be downloaded [here](https://github.com/adrianblakey/escape32-firmware/releases).
 
 Visit the [ESCape32 Wiki](https://github.com/neoxic/ESCape32/wiki) for more information.
 
